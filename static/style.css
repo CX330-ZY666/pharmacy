@@ -1,0 +1,16 @@
+/* 自定义样式 */
+body {
+    background-color: #f8f9fa;
+}
+
+/* 低库存/过期行标红 */
+.table .row-danger {
+    background-color: #f8d7da !important;
+}
+
+/* 卡片悬停效果 */
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    transition: all 0.2s;
+}

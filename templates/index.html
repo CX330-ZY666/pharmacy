@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 药品存销信息管理系统{% endblock %}
+
+{% block content %}
+<div class="text-center mt-5">
+    <h1>💊 药品存销信息管理系统</h1>
+    <p class="lead text-muted mt-3">实现药品进货、销售、库存的信息化管理</p>
+    <hr class="my-4">
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">📦 基础信息管理</h5>
+                <p class="card-text">管理药品、供应商、客户的基本信息</p>
+                <a href="/drug" class="btn btn-primary">药品管理</a>
+                <a href="/supplier" class="btn btn-outline-primary">供应商</a>
+                <a href="/customer" class="btn btn-outline-primary">客户</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">🛒 进货管理</h5>
+                <p class="card-text">采购单录入，支持批次管理和有效期记录</p>
+                <a href="/purchase" class="btn btn-success">进入</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">💰 销售管理</h5>
+                <p class="card-text">销售开单，按批次出库，自动扣减库存</p>
+                <a href="/sale" class="btn btn-warning">进入</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-2">
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">🔍 库存查询</h5>
+                <p class="card-text">实时查看库存，一目了然</p>
+                <a href="/inventory" class="btn btn-info">进入</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">⚠️ 预警信息</h5>
+                <p class="card-text">库存不足和即将过期药品自动预警</p>
+                <a href="/alert" class="btn btn-danger">进入</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">📊 统计报表</h5>
+                <p class="card-text">月销售额、利润统计与分析</p>
+                <a href="/report" class="btn btn-secondary">进入</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
