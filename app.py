@@ -13,6 +13,14 @@ app.secret_key = 'pharmacy_secret_key'
 
 
 # ==================== 数据库工具函数 ====================
+# DB_CONFIG = {
+#     'host': 'localhost',
+#     'user': 'root',
+#     'password': '123456',
+#     'database': 'pharmacy', 
+#     'charset': 'utf8mb4'
+# }
+
 
 def get_db():
     """获取数据库连接（每次请求复用同一个连接）"""
@@ -46,11 +54,11 @@ def index():
 
 
 # ==================== 注册蓝图（各模块路由）====================
-
-# 成员B：基础信息管理
+#成员B：
 from routes.drug import drug_bp
 from routes.supplier import supplier_bp
 from routes.customer import customer_bp
+# 注册蓝图
 app.register_blueprint(drug_bp)
 app.register_blueprint(supplier_bp)
 app.register_blueprint(customer_bp)
