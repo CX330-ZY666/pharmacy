@@ -1,8 +1,59 @@
-{% extends "base.html" %}
-{% block title %}供应商管理{% endblock %}
+<!-- 只显示修改部分，其他部分类似 -->
+<h2 class="mb-4">供应商信息管理</h2>
 
-{% block content %}
-<h2>🏭 供应商信息管理</h2>
-<!-- TODO: 成员B 实现完整页面（参考 drug/list.html，换字段） -->
-<p class="text-muted">此页面由成员B负责开发</p>
-{% endblock %}
+<!-- 搜索框修改 -->
+<input type="text" 
+       name="search" 
+       class="form-control me-2" 
+       placeholder="输入供应商名称、联系人或电话搜索..."
+       value="{{ search }}">
+
+<!-- 按钮修改 -->
+<a href="{{ url_for('supplier.add_supplier_form') }}" class="btn-add">
+    <i class="bi bi-plus-circle"></i> 新增供应商
+</a>
+
+<!-- 表格修改 -->
+<table class="table table-hover table-striped mb-0">
+    <thead class="table-dark">
+        <tr>
+            <th>ID</th>
+            <th>供应商名称</th>
+            <th>联系人</th>
+            <th>电话</th>
+            <th>地址</th>
+            <th>创建时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if suppliers %}
+            {% for supplier in suppliers %}
+            <tr>
+                <td>{{ supplier['id'] }}</td>
+                <td>{{ supplier['name'] }}</td>
+                <td>{{ supplier['contact'] or '--' }}</td>
+                <td>{{ supplier['phone'] or '--' }}</td>
+                <td>{{ supplier['address'] or '--' }}</td>
+                <td>{{ supplier['created_at'][:16] if supplier['created_at'] else '--' }}</td>
+                <td>
+                    <a href="{{ url_for('supplier.edit_supplier_form', supplier_id=supplier['id']) }}" class="btn-edit me-2">
+                        编辑
+                    </a>
+                    <a href="{{ url_for('supplier.delete_supplier', supplier_id=supplier['id']) }}" 
+                       class="btn-delete"
+                       onclick="return confirm('确定要删除该供应商吗？')">
+                        删除
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="7" class="text-center py-4">
+                    暂无供应商数据，请点击"新增供应商"添加
+                </td>
+            </tr>
+        {% endif %}
+    </tbody>
+</table>
