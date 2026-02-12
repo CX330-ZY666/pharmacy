@@ -118,17 +118,21 @@
                             {% if drugs %}
                                 {% for drug in drugs %}
                                 <tr>
-                                    <td>{{ drug['id'] }}</td>
+                                    <!-- 关键修改1：id → drug_id（已改好，保留） -->
+                                    <td>{{ drug['drug_id'] }}</td>
                                     <td>{{ drug['name'] }}</td>
                                     <td>{{ drug['type'] or '--' }}</td>
                                     <td>{{ drug['unit'] }}</td>
-                                    <td>{{ drug['specification'] or '--' }}</td>
+                                    <!-- 关键修改2：specification → spec（核心修复） -->
+                                    <td>{{ drug['spec'] or '--' }}</td>
                                     <td>{{ drug['created_at'][:16] if drug['created_at'] else '--' }}</td>
                                     <td>
-                                        <a href="{{ url_for('drug.edit_drug_form', drug_id=drug['id']) }}" class="btn-edit me-2">
+                                        <!-- 关键修改3：id → drug_id（已改好，保留） -->
+                                        <a href="{{ url_for('drug.edit_drug_form', drug_id=drug['drug_id']) }}" class="btn-edit me-2">
                                             编辑
                                         </a>
-                                        <a href="{{ url_for('drug.delete_drug', drug_id=drug['id']) }}" 
+                                        <!-- 关键修改4：id → drug_id（已改好，保留） -->
+                                        <a href="{{ url_for('drug.delete_drug', drug_id=drug['drug_id']) }}" 
                                            class="btn-delete"
                                            onclick="return confirm('确定要删除该药品吗？')">
                                             删除
@@ -139,7 +143,11 @@
                             {% else %}
                                 <tr>
                                     <td colspan="7" class="text-center py-4">
+                                        {% if search %}
+                                        未找到匹配"{{ search }}"的药品
+                                        {% else %}
                                         暂无药品数据，请点击"新增药品"添加
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endif %}

@@ -128,17 +128,21 @@
                             {% if customers %}
                                 {% for customer in customers %}
                                 <tr>
-                                    <td>{{ customer['id'] }}</td>
+                                    <!-- 关键修改1：显示客户主键（已改好，保留） -->
+                                    <td>{{ customer['customer_id'] }}</td>
                                     <td>{{ customer['name'] }}</td>
-                                    <td>{{ customer['contact'] or '--' }}</td>
+                                    <!-- 关键修改2：contact → contact_person（核心修复） -->
+                                    <td>{{ customer['contact_person'] or '--' }}</td>
                                     <td>{{ customer['phone'] or '--' }}</td>
                                     <td>{{ customer['address'] or '--' }}</td>
                                     <td>{{ customer['created_at'][:16] if customer['created_at'] else '--' }}</td>
                                     <td>
-                                        <a href="{{ url_for('customer.edit_customer_form', customer_id=customer['id']) }}" class="btn-edit me-2">
+                                        <!-- 关键修改3：编辑按钮传递正确ID（已改好，保留） -->
+                                        <a href="{{ url_for('customer.edit_customer_form', customer_id=customer['customer_id']) }}" class="btn-edit me-2">
                                             编辑
                                         </a>
-                                        <a href="{{ url_for('customer.delete_customer', customer_id=customer['id']) }}" 
+                                        <!-- 关键修改4：删除按钮传递正确ID（已改好，保留） -->
+                                        <a href="{{ url_for('customer.delete_customer', customer_id=customer['customer_id']) }}" 
                                            class="btn-delete"
                                            onclick="return confirm('确定要删除该客户吗？')">
                                             删除

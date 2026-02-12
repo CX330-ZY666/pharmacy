@@ -18,7 +18,8 @@
                         <h4 class="mb-0">编辑药品信息</h4>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="{{ url_for('drug.edit_drug', drug_id=drug['id']) }}">
+                        <!-- 关键修改：drug['id'] → drug['drug_id'] -->
+                        <form method="POST" action="{{ url_for('drug.edit_drug', drug_id=drug['drug_id']) }}">
                             <div class="mb-3">
                                 <label for="name" class="form-label">药品名称 <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="name" name="name" 

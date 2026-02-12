@@ -164,8 +164,9 @@
                                     <p class="mb-0 opacity-90">修改供应商资料，确保信息准确</p>
                                 </div>
                             </div>
+                            <!-- 关键修改1：id → supplier_id（已改好，保留） -->
                             <div class="supplier-id-badge">
-                                供应商ID: #{{ supplier['id'] }}
+                                供应商ID: #{{ supplier['supplier_id'] }}
                             </div>
                         </div>
                     </div>
@@ -227,7 +228,8 @@
                             修改供应商信息可能会影响相关的采购记录，请谨慎操作。
                         </div>
                         
-                        <form method="POST" action="{{ url_for('supplier.edit_supplier', supplier_id=supplier['id']) }}" id="editSupplierForm">
+                        <!-- 关键修改2：id → supplier_id（已改好，保留） -->
+                        <form method="POST" action="{{ url_for('supplier.edit_supplier', supplier_id=supplier['supplier_id']) }}" id="editSupplierForm">
                             <!-- 基础信息部分 -->
                             <div class="mb-4">
                                 <h4 class="section-title">基础信息</h4>
@@ -252,7 +254,8 @@
                                             <i class="bi bi-person"></i>
                                             <input type="text" class="form-control form-control-lg" 
                                                    id="contact" name="contact" 
-                                                   value="{{ supplier['contact'] or '' }}" 
+                                                   <!-- 关键修改3：contact → contact_person（核心修复） -->
+                                                   value="{{ supplier['contact_person'] or '' }}" 
                                                    placeholder="请输入联系人姓名">
                                         </div>
                                         <div class="form-text text-muted">
@@ -310,7 +313,8 @@
                                     </div>
                                     <div class="col-md-8">
                                         <div class="btn-action-group justify-content-md-end">
-                                            <a href="{{ url_for('supplier.delete_supplier', supplier_id=supplier['id']) }}" 
+                                            <!-- 关键修改4：id → supplier_id（已改好，保留） -->
+                                            <a href="{{ url_for('supplier.delete_supplier', supplier_id=supplier['supplier_id']) }}" 
                                                class="btn btn-delete"
                                                onclick="return confirmDelete()">
                                                 <i class="bi bi-trash"></i> 删除供应商

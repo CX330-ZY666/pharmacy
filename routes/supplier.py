@@ -3,43 +3,50 @@
 成员B负责开发
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-import sqlite3
-from config import DATABASE
+# 替换 sqlite3 为 pymysql
+import pymysql
 
 # 创建蓝图
 supplier_bp = Blueprint('supplier', __name__)
 
-@supplier_bp.route('/supplier')
+@supplier_bp.route('/supplier',strict_slashes=False)
 def supplier_list():
     """显示供应商列表（支持搜索）"""
+    # 延迟导入 get_db，避免循环导入
+    from app import get_db
     search = request.args.get('search', '').strip()
     
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    # 替换 SQLite 连接为 MySQL 连接
+    conn = get_db()
+    cursor = conn.cursor()  # get_db 已配置返回字典格式
     
     if search:
+        # 关键修改：contact → contact_person（匹配MySQL表字段）
         cursor.execute('''
             SELECT * FROM supplier 
-            WHERE name LIKE ? OR contact LIKE ? OR phone LIKE ?
-            ORDER BY id DESC
+            WHERE name LIKE %s OR contact_person LIKE %s OR phone LIKE %s
+            ORDER BY supplier_id DESC
         ''', ('%' + search + '%', '%' + search + '%', '%' + search + '%'))
     else:
-        cursor.execute('SELECT * FROM supplier ORDER BY id DESC')
+        # id 改为 supplier_id
+        cursor.execute('SELECT * FROM supplier ORDER BY supplier_id DESC')
     
     suppliers = cursor.fetchall()
-    conn.close()
+    # 移除手动关闭连接（由 app.py 自动处理）
     
     return render_template('supplier/list.html', suppliers=suppliers, search=search)
 
 @supplier_bp.route('/supplier/add', methods=['GET'])
 def add_supplier_form():
     """显示添加供应商表单"""
+    # 纯展示表单，无数据库操作，无需导入 get_db
     return render_template('supplier/add.html')
 
 @supplier_bp.route('/supplier/add', methods=['POST'])
 def add_supplier():
     """添加新供应商"""
+    # 延迟导入 get_db
+    from app import get_db
     name = request.form.get('name', '').strip()
     contact = request.form.get('contact', '').strip()
     phone = request.form.get('phone', '').strip()
@@ -51,14 +58,16 @@ def add_supplier():
         return redirect(url_for('supplier.add_supplier_form'))
     
     try:
-        conn = sqlite3.connect(DATABASE)
+        # 替换 SQLite 连接为 MySQL 连接
+        conn = get_db()
         cursor = conn.cursor()
+        # 关键修改：contact → contact_person（匹配MySQL表字段）
         cursor.execute('''
-            INSERT INTO supplier (name, contact, phone, address)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO supplier (name, contact_person, phone, address)
+            VALUES (%s, %s, %s, %s)
         ''', (name, contact, phone, address))
         conn.commit()
-        conn.close()
+        # 移除手动关闭连接
         
         flash('供应商添加成功', 'success')
         return redirect(url_for('supplier.supplier_list'))
@@ -69,12 +78,15 @@ def add_supplier():
 @supplier_bp.route('/supplier/edit/<int:supplier_id>', methods=['GET'])
 def edit_supplier_form(supplier_id):
     """显示编辑供应商表单"""
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
+    # 延迟导入 get_db
+    from app import get_db
+    # 替换 SQLite 连接为 MySQL 连接
+    conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM supplier WHERE id = ?', (supplier_id,))
+    # 占位符从 ? 改为 %s，id 改为 supplier_id
+    cursor.execute('SELECT * FROM supplier WHERE supplier_id = %s', (supplier_id,))
     supplier = cursor.fetchone()
-    conn.close()
+    # 移除手动关闭连接
     
     if not supplier:
         flash('供应商不存在', 'error')
@@ -85,6 +97,8 @@ def edit_supplier_form(supplier_id):
 @supplier_bp.route('/supplier/edit/<int:supplier_id>', methods=['POST'])
 def edit_supplier(supplier_id):
     """更新供应商信息"""
+    # 延迟导入 get_db
+    from app import get_db
     name = request.form.get('name', '').strip()
     contact = request.form.get('contact', '').strip()
     phone = request.form.get('phone', '').strip()
@@ -96,15 +110,17 @@ def edit_supplier(supplier_id):
         return redirect(url_for('supplier.edit_supplier_form', supplier_id=supplier_id))
     
     try:
-        conn = sqlite3.connect(DATABASE)
+        # 替换 SQLite 连接为 MySQL 连接
+        conn = get_db()
         cursor = conn.cursor()
+        # 关键修改：contact → contact_person（匹配MySQL表字段）
         cursor.execute('''
             UPDATE supplier 
-            SET name = ?, contact = ?, phone = ?, address = ?
-            WHERE id = ?
+            SET name = %s, contact_person = %s, phone = %s, address = %s
+            WHERE supplier_id = %s
         ''', (name, contact, phone, address, supplier_id))
         conn.commit()
-        conn.close()
+        # 移除手动关闭连接
         
         flash('供应商更新成功', 'success')
         return redirect(url_for('supplier.supplier_list'))
@@ -115,20 +131,27 @@ def edit_supplier(supplier_id):
 @supplier_bp.route('/supplier/delete/<int:supplier_id>')
 def delete_supplier(supplier_id):
     """删除供应商"""
+    # 延迟导入 get_db
+    from app import get_db
     try:
-        conn = sqlite3.connect(DATABASE)
+        # 替换 SQLite 连接为 MySQL 连接
+        conn = get_db()
         cursor = conn.cursor()
         
-        # 检查是否有采购记录
-        cursor.execute('SELECT COUNT(*) FROM purchase WHERE supplier_id = ?', (supplier_id,))
-        if cursor.fetchone()[0] > 0:
+        # 检查是否有采购记录（supplier_id 字段名本身正确，无需改）
+        # 占位符从 ? 改为 %s
+        cursor.execute('SELECT COUNT(*) FROM purchase WHERE supplier_id = %s', (supplier_id,))
+        # MySQL 返回字典，需用键取值
+        count = cursor.fetchone()['COUNT(*)']
+        if count > 0:
             flash('该供应商有采购记录，无法删除', 'error')
         else:
-            cursor.execute('DELETE FROM supplier WHERE id = ?', (supplier_id,))
+            # id 改为 supplier_id
+            cursor.execute('DELETE FROM supplier WHERE supplier_id = %s', (supplier_id,))
             conn.commit()
             flash('供应商删除成功', 'success')
         
-        conn.close()
+        # 移除手动关闭连接
     except Exception as e:
         flash(f'删除失败: {str(e)}', 'error')
     
