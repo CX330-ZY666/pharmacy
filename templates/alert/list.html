@@ -1,9 +1,202 @@
-{% extends "base.html" %}
-{% block title %}预警信息{% endblock %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>预警信息 - 药品存销管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .alert-item {
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+        .alert-item:hover {
+            transform: translateX(5px);
+        }
+        .low-stock-alert {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .expiring-alert {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .read-alert {
+            opacity: 0.6;
+            background-color: #f8f9fa;
+        }
+        .badge-unread {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    {% extends "base.html" %}
 
-{% block content %}
-<h2>⚠️ 预警信息</h2>
-<!-- TODO: 成员D 实现完整页面 -->
-<!-- 需要：预警列表（区分库存不足/即将过期）、标记已读按钮 -->
-<p class="text-muted">此页面由成员D负责开发</p>
-{% endblock %}
+    {% block content %}
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>⚠️ 预警信息</h2>
+                    <div>
+                        {% if low_stock_alerts or expiring_alerts %}
+                        <form method="post" action="{{ url_for('alert.alert_mark_all_read') }}" class="d-inline">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-all"></i> 全部标记为已读
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 预警统计 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card border-danger">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="card-title text-danger">{{ low_stock_alerts|length }}</h5>
+                                        <p class="card-text">库存不足预警</p>
+                                    </div>
+                                    <span class="badge bg-danger rounded-pill">紧急</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-warning">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="card-title text-warning">{{ expiring_alerts|length }}</h5>
+                                        <p class="card-text">即将过期预警</p>
+                                    </div>
+                                    <span class="badge bg-warning rounded-pill">警告</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 库存不足预警 -->
+                <div class="card mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-exclamation-triangle"></i> 库存不足预警
+                            <span class="badge bg-light text-danger ms-2">{{ low_stock_alerts|length }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if low_stock_alerts %}
+                        <div class="list-group">
+                            {% for alert in low_stock_alerts %}
+                            <div class="list-group-item alert-item low-stock-alert {% if alert.is_read %}read-alert{% endif %}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            {% if not alert.is_read %}
+                                            <span class="badge bg-danger badge-unread me-2">未读</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary me-2">已读</span>
+                                            {% endif %}
+                                            {{ alert.drug_name }} (批次: {{ alert.batch_no }})
+                                        </h6>
+                                        <p class="mb-1 text-muted">{{ alert.message }}</p>
+                                        <small class="text-muted">创建时间: {{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        {% if not alert.is_read %}
+                                        <a href="{{ url_for('alert.alert_mark_read', alert_id=alert.alert_id) }}"
+                                           class="btn btn-sm btn-outline-success">
+                                            <i class="bi bi-check-lg"></i> 标记已读
+                                        </a>
+                                        {% else %}
+                                        <span class="text-success">
+                                            <i class="bi bi-check-circle"></i> 已处理
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-success">
+                                <i class="bi bi-check-circle" style="font-size: 3rem;"></i>
+                                <h5 class="mt-3">暂无库存不足预警</h5>
+                                <p class="text-muted">所有药品库存充足</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 即将过期预警 -->
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-clock"></i> 即将过期预警
+                            <span class="badge bg-light text-warning ms-2">{{ expiring_alerts|length }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if expiring_alerts %}
+                        <div class="list-group">
+                            {% for alert in expiring_alerts %}
+                            <div class="list-group-item alert-item expiring-alert {% if alert.is_read %}read-alert{% endif %}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            {% if not alert.is_read %}
+                                            <span class="badge bg-warning badge-unread me-2">未读</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary me-2">已读</span>
+                                            {% endif %}
+                                            {{ alert.drug_name }} (批次: {{ alert.batch_no }})
+                                        </h6>
+                                        <p class="mb-1 text-muted">{{ alert.message }}</p>
+                                        <small class="text-muted">创建时间: {{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        {% if not alert.is_read %}
+                                        <a href="{{ url_for('alert.alert_mark_read', alert_id=alert.alert_id) }}"
+                                           class="btn btn-sm btn-outline-success">
+                                            <i class="bi bi-check-lg"></i> 标记已读
+                                        </a>
+                                        {% else %}
+                                        <span class="text-success">
+                                            <i class="bi bi-check-circle"></i> 已处理
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-success">
+                                <i class="bi bi-check-circle" style="font-size: 3rem;"></i>
+                                <h5 class="mt-3">暂无过期预警</h5>
+                                <p class="text-muted">所有药品都在有效期内</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

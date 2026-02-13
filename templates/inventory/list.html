@@ -1,9 +1,251 @@
-{% extends "base.html" %}
-{% block title %}库存查询{% endblock %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>库存查询 - 药品存销管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        .low-stock {
+            background-color: rgba(220, 53, 69, 0.1) !important;
+        }
+        .expiring-soon {
+            background-color: rgba(255, 193, 7, 0.1) !important;
+        }
+        .expired {
+            background-color: rgba(108, 117, 125, 0.1) !important;
+            text-decoration: line-through;
+        }
+        .search-form {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(0, 123, 255, 0.05);
+        }
+    </style>
+</head>
+<body>
+    {% extends "base.html" %}
 
-{% block content %}
-<h2>🔍 库存查询</h2>
-<!-- TODO: 成员D 实现完整页面 -->
-<!-- 需要：搜索框 + 库存表格（低库存标红、即将过期标红） -->
-<p class="text-muted">此页面由成员D负责开发</p>
-{% endblock %}
+    {% block content %}
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="mb-4"><i class="bi bi-search me-2"></i>库存查询</h2>
+
+                <!-- 搜索表单 -->
+                <div class="search-form">
+                    <form method="get" action="{{ url_for('inventory.inventory_list') }}" class="row g-3 align-items-center">
+                        <div class="col-md-8">
+                            <input type="text" name="keyword" class="form-control" placeholder="输入药品名称搜索..."
+                                   value="{{ keyword }}">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> 搜索
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <a href="{{ url_for('inventory.inventory_list') }}" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-arrow-clockwise"></i> 重置
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+
+                <!-- 库存统计卡片 -->
+                <div class="row mb-4 g-3">
+                    <!-- 总药品批次 -->
+                    <div class="col-md-3 col-6">
+                        <div class="card stat-card border-primary">
+                            <div class="card-body text-center">
+                                <i class="bi bi-boxes fs-1 text-primary mb-2"></i>
+                                <h3 class="card-title">{{ stocks|length }}</h3>
+                                <p class="card-text text-muted">总药品批次</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 低库存药品 -->
+                    <div class="col-md-3 col-6">
+                        <div class="card stat-card border-warning">
+                            <div class="card-body text-center">
+                                <i class="bi bi-exclamation-triangle fs-1 text-warning mb-2"></i>
+                                <h3 class="card-title">
+                                    {% set low_stock_list = [] %}
+                                    {% for item in stocks %}
+                                        {% if '库存不足' in item.stock_status or item.quantity < item.alert_quantity %}
+                                            {% set _ = low_stock_list.append(1) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {{ low_stock_list|length }}
+                                </h3>
+                                <p class="card-text text-muted">低库存药品</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 即将过期 -->
+                    <div class="col-md-3 col-6">
+                        <div class="card stat-card border-danger">
+                            <div class="card-body text-center">
+                                <i class="bi bi-clock fs-1 text-danger mb-2"></i>
+                                <h3 class="card-title">
+                                    {% set expiring_list = [] %}
+                                    {% for item in stocks %}
+                                        {% if '即将过期' in item.expiry_status or (item.days_remaining <= 30 and item.days_remaining > 0) %}
+                                            {% set _ = expiring_list.append(1) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {{ expiring_list|length }}
+                                </h3>
+                                <p class="card-text text-muted">即将过期</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 库存正常 -->
+                    <div class="col-md-3 col-6">
+                        <div class="card stat-card border-success">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle fs-1 text-success mb-2"></i>
+                                <h3 class="card-title">
+                                    {% set normal_list = [] %}
+                                    {% for item in stocks %}
+                                        {% if '正常' in item.stock_status and '正常' in item.expiry_status %}
+                                            {% set _ = normal_list.append(1) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {{ normal_list|length }}
+                                </h3>
+                                <p class="card-text text-muted">库存正常</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 库存表格 -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">库存明细</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if stocks %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>药品名称</th>
+                                        <th>药品类型</th>
+                                        <th>单位</th>
+                                        <th>批次号</th>
+                                        <th>库存数量</th>
+                                        <th>预警阈值</th>
+                                        <th>进货价</th>
+                                        <th>有效期</th>
+                                        <th>剩余天数</th>
+                                        <th>库存状态</th>
+                                        <th>有效期状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in stocks %}
+                                    <tr class="{% if item.expiry_status == '已过期' %}expired
+                                              {% elif item.expiry_status == '即将过期' %}expiring-soon
+                                              {% elif item.stock_status == '库存不足' %}low-stock{% endif %}">
+                                        <td>{{ item.drug_name }}</td>
+                                        <td>{{ item.drug_type }}</td>
+                                        <td>{{ item.unit }}</td>
+                                        <td><code>{{ item.batch_no }}</code></td>
+                                        <td>
+                                            <span class="badge {% if item.quantity < item.alert_quantity %}bg-danger{% else %}bg-success{% endif %}">
+                                                {{ item.quantity }}
+                                            </span>
+                                        </td>
+                                        <td>{{ item.alert_quantity }}</td>
+                                        <td>¥{{ "%.2f"|format(item.purchase_price) }}</td>
+                                        <td>{{ item.expiry_date }}</td>
+                                        <td>
+                                            <span class="badge {% if item.days_remaining <= 0 %}bg-danger
+                                                         {% elif item.days_remaining <= 30 %}bg-warning
+                                                         {% else %}bg-success{% endif %}">
+                                                {% if item.days_remaining <= 0 %}已过期
+                                                {% else %}{{ item.days_remaining }}天
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if item.stock_status == '库存不足' %}bg-danger{% else %}bg-success{% endif %}">
+                                                {{ item.stock_status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if item.expiry_status == '已过期' %}bg-danger
+                                                         {% elif item.expiry_status == '即将过期' %}bg-warning
+                                                         {% else %}bg-success{% endif %}">
+                                                {{ item.expiry_status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="bi bi-inbox fs-1"></i>
+                                <h4 class="mt-3">暂无库存数据</h4>
+                                <p>当前没有找到匹配的库存记录</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 图例说明 -->
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <span class="badge bg-danger">红色</span> 库存不足或已过期 |
+                        <span class="badge bg-warning">黄色</span> 即将过期(30天内) |
+                        <span class="badge bg-success">绿色</span> 库存正常
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block scripts %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 为表格行添加点击效果
+            document.querySelectorAll('.table tbody tr').forEach(row => {
+                row.addEventListener('click', function() {
+                    this.classList.toggle('table-active');
+                });
+            });
+
+            // 搜索框自动聚焦
+            const searchInput = document.querySelector('input[name="keyword"]');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        });
+    </script>
+    {% endblock %}
+</body>
+</html>

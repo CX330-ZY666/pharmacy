@@ -1,9 +1,524 @@
-{% extends "base.html" %}
-{% block title %}统计报表{% endblock %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统计报表 - 药品存销管理系统</title>
 
-{% block content %}
-<h2>📊 统计报表</h2>
-<!-- TODO: 成员D 实现完整页面 -->
-<!-- 需要：年月选择器 + 月销售额表格 + 利润统计表格 -->
-<p class="text-muted">此页面由成员D负责开发</p>
-{% endblock %}
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --success-color: #4cc9f0;
+            --warning-color: #f9c74f;
+            --danger-color: #f94144;
+            --info-color: #7209b7;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+
+        .page-header {
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+        }
+
+        .filter-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            height: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+        }
+
+        .stat-icon {
+            font-size: 2.8rem;
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }
+
+        .data-table-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+
+        .table th {
+            background-color: #f8f9fa;
+            border-top: none;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .table td {
+            vertical-align: middle;
+        }
+
+        .positive-value {
+            color: #198754;
+            font-weight: 600;
+        }
+
+        .negative-value {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .progress-thin {
+            height: 8px;
+            border-radius: 4px;
+        }
+
+        .badge-profit-high {
+            background-color: #198754;
+        }
+
+        .badge-profit-medium {
+            background-color: #fd7e14;
+        }
+
+        .badge-profit-low {
+            background-color: #dc3545;
+        }
+
+        .badge-profit-zero {
+            background-color: #6c757d;
+        }
+
+        .empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            color: #6c757d;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .footer-info {
+            font-size: 0.85rem;
+            color: #6c757d;
+            padding: 15px 0;
+            border-top: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <!-- 假设您有基础模板 base.html -->
+    {% extends "base.html" %}
+
+    {% block content %}
+    <div class="container-fluid py-4">
+        <!-- 页面标题 -->
+        <div class="page-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="h2 mb-0">
+                        <i class="bi bi-bar-chart-fill me-2" style="color: var(--primary-color);"></i>
+                        销售与利润统计报表
+                    </h1>
+                    <p class="text-muted mb-0">基于月度数据的详细销售分析与利润统计</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="/api/report/test?year={{ query_year }}&month={{ query_month }}"
+                       target="_blank"
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-code-slash me-1"></i>查看API数据
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 错误提示 -->
+        {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>错误：</strong> {{ error }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+
+        <!-- 查询筛选区域 -->
+        <div class="filter-card p-4">
+            <h5 class="mb-3">
+                <i class="bi bi-funnel me-2"></i>数据筛选
+            </h5>
+            <form method="get" action="{{ url_for('report.report_index') }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="yearSelect" class="form-label fw-semibold">选择年份</label>
+                    <select class="form-select" id="yearSelect" name="year" required>
+                        {% for y in year_options %}
+                            <option value="{{ y }}" {% if y == query_year %}selected{% endif %}>{{ y }}年</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="monthSelect" class="form-label fw-semibold">选择月份</label>
+                    <select class="form-select" id="monthSelect" name="month" required>
+                        {% for m in month_options %}
+                            <option value="{{ m.value }}" {% if m.value == query_month %}selected{% endif %}>{{ m.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="d-grid gap-2 d-md-flex w-100">
+                        <button type="submit" class="btn btn-primary flex-fill">
+                            <i class="bi bi-search me-2"></i>查询数据
+                        </button>
+                        <a href="{{ url_for('report.report_index') }}" class="btn btn-outline-secondary flex-fill">
+                            <i class="bi bi-arrow-clockwise me-2"></i>重置
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 关键指标卡片 -->
+        <div class="row g-4 mb-4">
+            <!-- 月度销售总额 -->
+            <div class="col-xl-3 col-lg-6">
+                <div class="card stat-card border-start border-5 border-primary">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-currency-dollar stat-icon text-primary"></i>
+                        <h2 class="card-title fw-bold">¥{{ "%0.2f"|format(total_sales) }}</h2>
+                        <p class="card-text text-muted mb-2">月度销售总额</p>
+                        <div class="badge bg-primary bg-opacity-10 text-primary">
+                            {{ query_year }}年{{ query_month }}月
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 月度利润总额 -->
+            <div class="col-xl-3 col-lg-6">
+                <div class="card stat-card border-start border-5 border-success">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-cash-coin stat-icon text-success"></i>
+                        <h2 class="card-title fw-bold positive-value">¥{{ "%0.2f"|format(total_profit) }}</h2>
+                        <p class="card-text text-muted mb-2">月度利润总额</p>
+                        <div class="badge bg-success bg-opacity-10 text-success">
+                            利润率 {{ "%0.1f"|format(avg_profit_rate) }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 收支对比 -->
+            <div class="col-xl-3 col-lg-6">
+                <div class="card stat-card border-start border-5 border-info">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-graph-up-arrow stat-icon text-info"></i>
+                        <div class="row">
+                            <div class="col-6">
+                                <h5 class="fw-bold">¥{{ "%0.2f"|format(total_income) }}</h5>
+                                <small class="text-muted">总收入</small>
+                            </div>
+                            <div class="col-6">
+                                <h5 class="fw-bold">¥{{ "%0.2f"|format(total_cost) }}</h5>
+                                <small class="text-muted">总成本</small>
+                            </div>
+                        </div>
+                        <p class="card-text text-muted mt-2 mb-0">收支分析</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 销售品种数 -->
+            <div class="col-xl-3 col-lg-6">
+                <div class="card stat-card border-start border-5 border-warning">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-box-seam stat-icon text-warning"></i>
+                        <h2 class="card-title fw-bold">{{ sales|length }}</h2>
+                        <p class="card-text text-muted mb-2">销售商品种类</p>
+                        <div class="badge bg-warning bg-opacity-10 text-warning">
+                            合计 {{ sales|sum(attribute='销售数量') }} 件
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据表格区域 -->
+        <div class="row">
+            <!-- 月度销售统计表 -->
+            <div class="col-lg-6 mb-4">
+                <div class="data-table-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="bi bi-receipt me-2" style="color: var(--primary-color);"></i>
+                            月度销售明细
+                        </h5>
+                        <span class="badge bg-primary">
+                            {{ query_year }}年{{ query_month }}月
+                        </span>
+                    </div>
+
+                    {% if sales %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th width="40%">药品名称</th>
+                                    <th class="text-end" width="20%">销售数量</th>
+                                    <th class="text-end" width="25%">销售额 (¥)</th>
+                                    <th class="text-end" width="15%">占比</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in sales %}
+                                <tr>
+                                    <td class="fw-semibold">{{ item['药品名称'] }}</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-primary bg-opacity-10 text-primary">
+                                            {{ item['销售数量'] }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        ¥{{ "%0.2f"|format(item['销售额']) }}
+                                    </td>
+                                    <td class="text-end">
+                                        {% set sales_percent = (item['销售额'] / total_sales * 100) if total_sales > 0 else 0 %}
+                                        <div class="d-flex align-items-center justify-content-end">
+                                            <div class="progress progress-thin me-2" style="width: 60px;">
+                                                <div class="progress-bar bg-primary"
+                                                     role="progressbar"
+                                                     style="width: {{ sales_percent }}%">
+                                                </div>
+                                            </div>
+                                            <span class="text-muted" style="font-size: 0.85rem; min-width: 45px;">
+                                                {{ "%0.1f"|format(sales_percent) }}%
+                                            </span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-group-divider">
+                                <tr class="table-light">
+                                    <th class="fw-bold">合计</th>
+                                    <th class="text-end fw-bold">{{ sales|sum(attribute='销售数量') }}</th>
+                                    <th class="text-end fw-bold">¥{{ "%0.2f"|format(total_sales) }}</th>
+                                    <th class="text-end fw-bold">100%</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-clipboard-x empty-state-icon"></i>
+                        <h5 class="mb-2">暂无销售数据</h5>
+                        <p class="text-muted mb-0">当前筛选条件下未找到销售记录。</p>
+                        <p class="text-muted small mt-2">
+                            <i class="bi bi-info-circle me-1"></i>
+                            提示：数据库测试数据中有2025年12月、2026年1月的销售记录
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 月度利润分析表 -->
+            <div class="col-lg-6 mb-4">
+                <div class="data-table-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="bi bi-calculator me-2" style="color: var(--success-color);"></i>
+                            月度利润分析
+                        </h5>
+                        <span class="badge bg-success">
+                            {{ query_year }}年{{ query_month }}月
+                        </span>
+                    </div>
+
+                    {% if profits %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th width="35%">药品名称</th>
+                                    <th class="text-end" width="15%">销量</th>
+                                    <th class="text-end" width="20%">收入 (¥)</th>
+                                    <th class="text-end" width="20%">利润 (¥)</th>
+                                    <th class="text-end" width="10%">利润率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in profits %}
+                                {% set income = item['销售收入'] %}
+                                {% set profit = item['利润'] %}
+                                {% set profit_rate = (profit / income * 100) if income > 0 else 0 %}
+
+                                <tr>
+                                    <td class="fw-semibold">{{ item['药品名称'] }}</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary">
+                                            {{ item['销售数量'] }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        ¥{{ "%0.2f"|format(income) }}
+                                    </td>
+                                    <td class="text-end fw-bold {% if profit >= 0 %}positive-value{% else %}negative-value{% endif %}">
+                                        ¥{{ "%0.2f"|format(profit) }}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if income > 0 %}
+                                            {% if profit_rate >= 20 %}
+                                                <span class="badge badge-profit-high">高</span>
+                                            {% elif profit_rate >= 10 %}
+                                                <span class="badge badge-profit-medium">中</span>
+                                            {% elif profit_rate > 0 %}
+                                                <span class="badge badge-profit-low">低</span>
+                                            {% else %}
+                                                <span class="badge badge-profit-zero">零</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge badge-profit-zero">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-group-divider">
+                                <tr class="table-light">
+                                    <th class="fw-bold">合计</th>
+                                    <th class="text-end fw-bold">{{ profits|sum(attribute='销售数量') }}</th>
+                                    <th class="text-end fw-bold">¥{{ "%0.2f"|format(total_income) }}</th>
+                                    <th class="text-end fw-bold {% if total_profit >= 0 %}positive-value{% else %}negative-value{% endif %}">
+                                        ¥{{ "%0.2f"|format(total_profit) }}
+                                    </th>
+                                    <th class="text-end fw-bold">
+                                        {% if total_income > 0 %}
+                                            {% set total_profit_rate = (total_profit / total_income * 100) %}
+                                            {% if total_profit_rate >= 20 %}
+                                                <span class="badge badge-profit-high">{{ "%0.1f"|format(total_profit_rate) }}%</span>
+                                            {% elif total_profit_rate >= 10 %}
+                                                <span class="badge badge-profit-medium">{{ "%0.1f"|format(total_profit_rate) }}%</span>
+                                            {% elif total_profit_rate > 0 %}
+                                                <span class="badge badge-profit-low">{{ "%0.1f"|format(total_profit_rate) }}%</span>
+                                            {% else %}
+                                                <span class="badge badge-profit-zero">{{ "%0.1f"|format(total_profit_rate) }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge badge-profit-zero">0.0%</span>
+                                        {% endif %}
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-calculator empty-state-icon"></i>
+                        <h5 class="mb-2">暂无利润数据</h5>
+                        <p class="text-muted mb-0">当前筛选条件下未找到利润记录。</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚信息 -->
+        <div class="footer-info mt-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <small>
+                        <i class="bi bi-clock-history me-1"></i>
+                        报表生成时间: {{ current_time.strftime('%Y-%m-%d %H:%M:%S') if current_time else '未知' }}
+                    </small>
+                </div>
+                <div class="col-md-6 text-end">
+                    <small>
+                        <i class="bi bi-database me-1"></i>
+                        数据来源: 药品存销管理系统 |
+                        当前查询: {{ query_year }}年{{ query_month }}月
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block scripts %}
+    {{ super() }}
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('报表页面加载完成');
+
+            // 表单快速提交：选择年月后自动查询
+            const yearSelect = document.getElementById('yearSelect');
+            const monthSelect = document.getElementById('monthSelect');
+
+            if (yearSelect && monthSelect) {
+                // 监听选择变化
+                yearSelect.addEventListener('change', function() {
+                    this.form.submit();
+                });
+
+                monthSelect.addEventListener('change', function() {
+                    this.form.submit();
+                });
+            }
+
+            // 为表格行添加点击效果
+            document.querySelectorAll('.table-hover tbody tr').forEach(row => {
+                row.style.cursor = 'pointer';
+                row.addEventListener('click', function() {
+                    // 移除其他行的选中状态
+                    document.querySelectorAll('.table-hover tbody tr').forEach(r => {
+                        r.classList.remove('table-active');
+                    });
+                    // 添加当前行的选中状态
+                    this.classList.add('table-active');
+                });
+            });
+
+            // 显示数据统计信息
+            const salesCount = {{ sales|length }};
+            const profitsCount = {{ profits|length }};
+
+            if (salesCount > 0 || profitsCount > 0) {
+                console.log(`📊 数据统计: 销售记录 ${salesCount} 条, 利润记录 ${profitsCount} 条`);
+            }
+        });
+
+        // 快捷键支持：按F5刷新，按ESC重置表单
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F5') {
+                e.preventDefault();
+                window.location.reload();
+            } else if (e.key === 'Escape') {
+                window.location.href = "{{ url_for('report.report_index') }}";
+            }
+        });
+    </script>
+    {% endblock %}
+</body>
+</html>
