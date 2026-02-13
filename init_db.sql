@@ -1,4 +1,4 @@
--- ============================================================
+ -- ============================================================
 -- 药品存销信息管理系统 - 数据库初始化脚本
 -- 使用方法：在 MySQL Workbench 中打开此文件，全选执行
 -- ============================================================
@@ -6,11 +6,10 @@
 -- 创建数据库
 CREATE DATABASE IF NOT EXISTS pharmacy DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_general_ci;
 USE pharmacy;
-
 -- ============================================================
 -- 一、建表（8张表）
 -- ============================================================
-
+SET SQL_SAFE_UPDATES = 0;
 -- 1. 药品表
 CREATE TABLE IF NOT EXISTS drug (
     drug_id    INT PRIMARY KEY AUTO_INCREMENT COMMENT '药品编号',
@@ -114,33 +113,78 @@ CREATE TABLE IF NOT EXISTS alert (
 -- 触发器1：库存不足预警
 -- 当 inventory 的 quantity 被更新后，如果低于预警阈值，自动写入 alert 表
 DELIMITER //
+
 CREATE TRIGGER trg_low_stock
 AFTER UPDATE ON inventory
 FOR EACH ROW
 BEGIN
-    IF NEW.quantity < NEW.alert_quantity AND NEW.quantity >= 0 THEN
-        INSERT INTO alert(drug_id, batch_no, alert_type, message, created_at, is_read)
-        VALUES(NEW.drug_id, NEW.batch_no, 'LOW_STOCK',
-               CONCAT('库存不足预警：药品ID=', NEW.drug_id, ' 批次=', NEW.batch_no, ' 当前库存=', NEW.quantity),
-               NOW(), 0);
+    -- 只有当库存数量发生变化，且新库存小于预警阈值，且库存非负时触发
+    IF NEW.quantity <> OLD.quantity
+       AND NEW.quantity < NEW.alert_quantity
+       AND NEW.quantity >= 0 THEN
+
+        -- 检查是否已存在相同的未读预警
+        IF NOT EXISTS (
+            SELECT 1 FROM alert
+            WHERE drug_id = NEW.drug_id
+              AND batch_no = NEW.batch_no
+              AND alert_type = 'LOW_STOCK'
+              AND is_read = 0
+              -- 移除日期限制，检查所有未读预警
+        ) THEN
+            INSERT INTO alert(drug_id, batch_no, alert_type, message, created_at, is_read)
+            VALUES(
+                NEW.drug_id,
+                NEW.batch_no,
+                'LOW_STOCK',
+                CONCAT('库存不足预警：',
+                       (SELECT name FROM drug WHERE drug_id = NEW.drug_id),
+                       ' 批次=', NEW.batch_no,
+                       ' 当前库存=', NEW.quantity, '，低于预警阈值', NEW.alert_quantity),
+                NOW(),
+                0
+            );
+        END IF;
     END IF;
 END//
+
 DELIMITER ;
 
 -- 触发器2：过期预警
 -- 当 inventory 新增记录时，如果有效期在30天内，自动写入 alert 表
 DELIMITER //
+
 CREATE TRIGGER trg_expiry_warn
 AFTER INSERT ON inventory
 FOR EACH ROW
 BEGIN
+    -- 检查有效期是否在30天内（包括已过期的情况）
     IF DATEDIFF(NEW.expiry_date, CURDATE()) <= 30 THEN
-        INSERT INTO alert(drug_id, batch_no, alert_type, message, created_at, is_read)
-        VALUES(NEW.drug_id, NEW.batch_no, 'EXPIRING',
-               CONCAT('过期预警：药品ID=', NEW.drug_id, ' 批次=', NEW.batch_no, ' 将于', NEW.expiry_date, '过期'),
-               NOW(), 0);
+        -- 检查是否已存在相同的未读预警
+        IF NOT EXISTS (
+            SELECT 1 FROM alert
+            WHERE drug_id = NEW.drug_id
+              AND batch_no = NEW.batch_no
+              AND alert_type = 'EXPIRING'
+              AND is_read = 0
+        ) THEN
+            INSERT INTO alert(drug_id, batch_no, alert_type, message, created_at, is_read)
+            VALUES(
+                NEW.drug_id,
+                NEW.batch_no,
+                'EXPIRING',
+                CONCAT('过期预警：',
+                       (SELECT name FROM drug WHERE drug_id = NEW.drug_id),
+                       ' 批次=', NEW.batch_no,
+                       ' 有效期至', NEW.expiry_date,
+                       ' 剩余', DATEDIFF(NEW.expiry_date, CURDATE()), '天'),
+                NOW(),
+                0
+            );
+        END IF;
     END IF;
 END//
+
 DELIMITER ;
 
 
@@ -327,3 +371,5 @@ INSERT INTO alert (drug_id, batch_no, alert_type, message, created_at, is_read) 
 UPDATE sale SET total_amount = (
     SELECT COALESCE(SUM(quantity * price), 0) FROM sale_detail WHERE sale_detail.sale_id = sale.sale_id
 );
+
+SET SQL_SAFE_UPDATES = 1;
