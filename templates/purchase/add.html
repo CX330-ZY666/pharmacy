@@ -2,8 +2,110 @@
 {% block title %}新增采购单{% endblock %}
 
 {% block content %}
-<h2>🛒 新增采购单</h2>
-<!-- TODO: 成员C 实现完整页面 -->
-<!-- 需要：选供应商下拉框、日期、动态添加明细行（药品+批次号+数量+单价+有效期） -->
-<p class="text-muted">此页面由成员C负责开发</p>
+<div class="main-container">
+    <div class="page-header">
+        <h2>🛒 新增采购单</h2>
+        <div class="dev-tag">此页面由成员C负责开发</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('purchase.purchase_add') }}" class="card form-card">
+        <div class="form-group">
+            <label for="supplier_id" class="form-label">供应商</label>
+            <select name="supplier_id" id="supplier_id" class="form-control" required>
+                <option value="">请选择供应商</option>
+                {% for supplier in suppliers %}
+                <option value="{{ supplier.supplier_id }}">{{ supplier.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="purchase_date" class="form-label">采购日期</label>
+            <input type="date" name="purchase_date" id="purchase_date" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">采购明细</label>
+            <table id="details-table" class="data-table">
+                <thead>
+                    <tr>
+                        <th>药品名称</th>
+                        <th>批次号</th>
+                        <th>数量</th>
+                        <th>单价(元)</th>
+                        <th>有效期</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <select name="drug_id[]" class="form-control" required>
+                                <option value="">请选择药品</option>
+                                {% for drug in drugs %}
+                                <option value="{{ drug.drug_id }}">{{ drug.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="text" name="batch_no[]" class="form-control" required></td>
+                        <td><input type="number" name="quantity[]" class="form-control" min="1" required></td>
+                        <td><input type="number" name="price[]" class="form-control" step="0.01" min="0" required></td>
+                        <td><input type="date" name="expiry_date[]" class="form-control" required></td>
+                        <td>
+                            <button type="button" class="btn-danger" onclick="this.closest('tr').remove()">删除</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="button" class="btn-secondary" onclick="addDetailRow()" style="margin-top: 10px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14" />
+                </svg>
+                添加明细行
+            </button>
+        </div>
+
+        <div class="form-group">
+            <label for="note" class="form-label">备注</label>
+            <textarea name="note" id="note" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">提交采购单</button>
+            <a href="{{ url_for('purchase.purchase_list') }}" class="btn-secondary">取消</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    function addDetailRow() {
+        const table = document.getElementById('details-table');
+        const newRow = table.insertRow();
+        newRow.innerHTML = `
+            <td>
+                <select name="drug_id[]" class="form-control" required>
+                    <option value="">请选择药品</option>
+                    {% for drug in drugs %}
+                    <option value="{{ drug.drug_id }}">{{ drug.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td><input type="text" name="batch_no[]" class="form-control" required></td>
+            <td><input type="number" name="quantity[]" class="form-control" min="1" required></td>
+            <td><input type="number" name="price[]" class="form-control" step="0.01" min="0" required></td>
+            <td><input type="date" name="expiry_date[]" class="form-control" required></td>
+            <td>
+                <button type="button" class="btn-danger" onclick="this.closest('tr').remove()">删除</button>
+            </td>
+        `;
+    }
+</script>
 {% endblock %}

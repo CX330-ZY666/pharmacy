@@ -2,8 +2,224 @@
 {% block title %}新增销售单{% endblock %}
 
 {% block content %}
-<h2>💰 新增销售单</h2>
-<!-- TODO: 成员C 实现完整页面 -->
-<!-- 需要：选客户下拉框、日期、动态添加明细行（药品+批次+数量+售价），批次只显示有库存的 -->
-<p class="text-muted">此页面由成员C负责开发</p>
+<div class="main-container">
+    <div class="page-header">
+        <h2>💰 新增销售单</h2>
+        <div class="dev-tag">此页面由成员C负责开发</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('sale.sale_add') }}" class="card form-card" id="sale-form">
+        <div class="form-group">
+            <label for="customer_id" class="form-label">客户</label>
+            <select name="customer_id" id="customer_id" class="form-control" required>
+                <option value="">请选择客户</option>
+                {% for customer in customers %}
+                <option value="{{ customer.customer_id }}">{{ customer.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="sale_date" class="form-label">销售日期</label>
+            <input type="date" name="sale_date" id="sale_date" class="form-control" value="{{ now_date }}" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">销售明细</label>
+            <table id="details-table" class="data-table">
+                <thead>
+                    <tr>
+                        <th>药品名称</th>
+                        <th>批次号</th>
+                        <th>数量</th>
+                        <th>单价(元)</th>
+                        <th>小计</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="details-tbody">
+                    <tr class="detail-row">
+                        <td>
+                            <select name="drug_id[]" class="form-control drug-select" required>
+                                <option value="">请选择药品</option>
+                                {% for item in inventory %}
+                                <option value="{{ item.drug_id }}">{{ item.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <select name="batch_no[]" class="form-control batch-select" required disabled>
+                                <option value="">请先选择药品</option>
+                            </select>
+                        </td>
+                        <td><input type="number" name="quantity[]" class="form-control quantity" min="1" required></td>
+                        <td><input type="number" name="price[]" class="form-control price" step="0.01" min="0.01"
+                                required></td>
+                        <td class="subtotal">0.00</td>
+                        <td>
+                            <button type="button" class="btn-danger remove-row-btn">删除</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="button" class="btn-secondary" id="add-row-btn" style="margin-top: 10px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14" />
+                </svg>
+                添加明细行
+            </button>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">提交销售单</button>
+            <a href="{{ url_for('sale.sale_list') }}" class="btn-secondary">取消</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // 库存数据（从后端传递）
+    const inventoryData = JSON.parse('{{ inventory_json|safe }}');
+
+    // 将库存数据转换为药品ID为键的映射
+    const inventoryMap = {};
+    inventoryData.forEach(item => {
+        inventoryMap[item.drug_id] = item;
+    });
+
+    // 更新批次下拉框
+    function updateBatchSelect(drugId, batchSelect) {
+        batchSelect.innerHTML = '<option value="">请选择批次</option>';
+
+        if (drugId && inventoryMap[drugId]) {
+            const batches = inventoryMap[drugId].batches;
+            batches.forEach(batch => {
+                const option = document.createElement('option');
+                option.value = batch.batch_no;
+                option.textContent = `${batch.batch_no} (库存: ${batch.quantity})`;
+                batchSelect.appendChild(option);
+            });
+            batchSelect.disabled = false;
+        } else {
+            batchSelect.disabled = true;
+        }
+    }
+
+    // 计算小计和总计
+    function calculateSubtotal(row) {
+        const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
+        const price = parseFloat(row.querySelector('.price').value) || 0;
+        const subtotal = quantity * price;
+        row.querySelector('.subtotal').textContent = subtotal.toFixed(2);
+    }
+
+    // 添加新行
+    document.getElementById('add-row-btn').addEventListener('click', function () {
+        const tbody = document.getElementById('details-tbody');
+        const newRow = document.createElement('tr');
+        newRow.className = 'detail-row';
+
+        // 生成药品选项HTML
+        let drugOptions = '<option value="">请选择药品</option>';
+        for (const drugId in inventoryMap) {
+            const item = inventoryMap[drugId];
+            drugOptions += `<option value="${drugId}">${item.name}</option>`;
+        }
+
+        newRow.innerHTML = `
+            <td>
+                <select name="drug_id[]" class="form-control drug-select" required>
+                    ${drugOptions}
+                </select>
+            </td>
+            <td>
+                <select name="batch_no[]" class="form-control batch-select" required disabled>
+                    <option value="">请先选择药品</option>
+                </select>
+            </td>
+            <td><input type="number" name="quantity[]" class="form-control quantity" min="1" required></td>
+            <td><input type="number" name="price[]" class="form-control price" step="0.01" min="0.01" required></td>
+            <td class="subtotal">0.00</td>
+            <td>
+                <button type="button" class="btn-danger remove-row-btn">删除</button>
+            </td>
+        `;
+
+        tbody.appendChild(newRow);
+
+        // 为新行的药品选择框添加事件监听
+        const newDrugSelect = newRow.querySelector('.drug-select');
+        newDrugSelect.addEventListener('change', function () {
+            const batchSelect = this.closest('.detail-row').querySelector('.batch-select');
+            updateBatchSelect(this.value, batchSelect);
+        });
+
+        // 为新行的数量/单价输入框添加事件监听
+        newRow.querySelector('.quantity').addEventListener('input', function () {
+            calculateSubtotal(this.closest('.detail-row'));
+        });
+
+        newRow.querySelector('.price').addEventListener('input', function () {
+            calculateSubtotal(this.closest('.detail-row'));
+        });
+    });
+
+    // 删除行
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('remove-row-btn')) {
+            const row = e.target.closest('.detail-row');
+            const allRows = document.querySelectorAll('.detail-row');
+            if (allRows.length > 1) {
+                row.remove();
+            }
+        }
+    });
+
+    // 为现有的药品选择框添加事件监听
+    document.querySelectorAll('.drug-select').forEach(select => {
+        select.addEventListener('change', function () {
+            const batchSelect = this.closest('.detail-row').querySelector('.batch-select');
+            updateBatchSelect(this.value, batchSelect);
+        });
+    });
+
+    // 为现有的数量/单价输入框添加事件监听
+    document.querySelectorAll('.quantity').forEach(input => {
+        input.addEventListener('input', function () {
+            calculateSubtotal(this.closest('.detail-row'));
+        });
+    });
+
+    document.querySelectorAll('.price').forEach(input => {
+        input.addEventListener('input', function () {
+            calculateSubtotal(this.closest('.detail-row'));
+        });
+    });
+
+    // 表单提交验证
+    document.getElementById('sale-form').addEventListener('submit', function (e) {
+        const batchSelects = document.querySelectorAll('.batch-select');
+        let isValid = true;
+
+        // 验证所有药品和批次都已选择
+        batchSelects.forEach(select => {
+            if (!select.value || select.disabled) {
+                alert('请为所有药品选择批次');
+                isValid = false;
+            }
+        });
+
+        if (!isValid) {
+            e.preventDefault();
+        }
+    });
+</script>
 {% endblock %}

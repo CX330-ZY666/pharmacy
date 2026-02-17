@@ -2,8 +2,340 @@
 {% block title %}销售管理{% endblock %}
 
 {% block content %}
-<h2>💰 销售管理</h2>
-<a href="/sale/add" class="btn btn-warning mb-3">+ 新增销售单</a>
-<!-- TODO: 成员C 实现销售单列表表格 -->
-<p class="text-muted">此页面由成员C负责开发</p>
+<div class="main-container">
+    <h2>💰 销售管理</h2>
+    <a href="{{ url_for('sale.sale_add') }}" class="btn btn-success mb-3">+ 新增销售单</a>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- 销售单列表 -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center" style="width: 70px;">序号</th>
+                            <th style="width: 120px;">销售单号</th>
+                            <th style="width: 110px;">销售日期</th>
+                            <th style="min-width: 150px;">客户</th>
+                            <th style="width: 120px; text-align: right; padding-right: 20px;">总金额</th>
+                            <th class="text-center" style="width: 100px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if sales %}
+                        {% for sale in sales %}
+                        <tr>
+                            <td class="text-center">{{ sale.reverse_index }}</td>
+                            <td>SALE-{{ "%04d"|format(sale.sale_id) }}</td>
+                            <td>{{ sale.sale_date }}</td>
+                            <td>{{ sale.customer_name }}</td>
+                            <td style="text-align: right; padding-right: 20px;">
+                                <span class="text-success fw-bold">¥{{ "%.2f"|format(sale.total_amount) }}</span>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-primary btn-sm view-detail-btn"
+                                    data-sale-id="{{ sale.sale_id }}">
+                                    查看详情
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">暂无销售记录</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 添加分页信息 -->
+            {% if sales %}
+            <div class="mt-3 text-muted text-end">
+                <small>共 {{ total_count }} 条记录</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 详情模态框 -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">销售单详情 #<span id="modalSaleNo"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-2">正在加载详情...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 使用Bootstrap 5的模态框
+    document.addEventListener('DOMContentLoaded', function () {
+        // 绑定查看按钮点击事件
+        document.addEventListener('click', function (event) {
+            if (event.target && event.target.classList.contains('view-detail-btn')) {
+                const saleId = event.target.getAttribute('data-sale-id');
+                if (saleId) {
+                    showSaleDetail(saleId);
+                }
+            }
+        });
+    });
+
+    // 显示销售单详情
+    async function showSaleDetail(saleId) {
+        try {
+            console.log('正在获取销售单详情，ID:', saleId);
+
+            // 设置销售单号
+            const saleNo = 'SALE-' + String(saleId).padStart(4, '0');
+            document.getElementById('modalSaleNo').textContent = saleNo;
+
+            // 显示加载中状态
+            document.getElementById('modal-body').innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2">正在加载详情...</p>
+            </div>
+        `;
+
+            // 显示模态框
+            const detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+            detailModal.show();
+
+            // 发送请求获取详情
+            const response = await fetch(`/sale/${saleId}`);
+
+            // 检查响应状态
+            if (!response.ok) {
+                throw new Error(`HTTP错误: ${response.status} ${response.statusText}`);
+            }
+
+            // 解析响应数据
+            const result = await response.json();
+
+            // 检查后端返回的success字段
+            if (!result.success) {
+                throw new Error(result.message || '获取详情失败');
+            }
+
+            // 更新模态框内容
+            const sale = result.sale;
+            const details = result.details || [];
+
+            let html = `
+            <div class="mb-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>销售单号:</strong> SALE-${sale.sale_id.toString().padStart(4, '0')}</p>
+                        <p><strong>客户:</strong> ${sale.customer_name || '未知'}</p>
+        `;
+
+            // 添加联系方式（如果存在）
+            const contactFields = ['phone', 'tel', 'mobile', 'contact_info'];
+            let hasContact = false;
+            contactFields.forEach(field => {
+                if (sale[field]) {
+                    html += `<p><strong>${field === 'mobile' ? '手机' : '电话'}:</strong> ${sale[field]}</p>`;
+                    hasContact = true;
+                }
+            });
+
+            if (!hasContact) {
+                html += `<p><strong>电话:</strong> 未填写</p>`;
+            }
+
+            html += `
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>销售日期:</strong> ${sale.sale_date || '未知'}</p>
+                        <p><strong>地址:</strong> ${sale.address || '未填写'}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="alert alert-success">
+                            <h5 class="mb-0"><strong>总金额:</strong> ¥${sale.total_amount ? parseFloat(sale.total_amount).toFixed(2) : '0.00'}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h5>销售明细</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center" style="width: 60px;">序号</th>
+                            <th style="min-width: 150px;">药品名称</th>
+                            <th style="width: 120px;">批次号</th>
+                            <th class="text-end" style="width: 80px;">数量</th>
+                            <th class="text-end" style="width: 100px;">单价</th>
+                            <th class="text-end" style="width: 120px;">小计</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+            if (details && details.length > 0) {
+                let totalSubtotal = 0;
+                details.forEach((detail, index) => {
+                    const quantity = detail.quantity || 0;
+                    const price = detail.price || 0;
+                    const subtotal = quantity * price;
+                    totalSubtotal += subtotal;
+
+                    html += `
+                    <tr>
+                        <td class="text-center">${index + 1}</td>
+                        <td>${detail.drug_name || '未知'}</td>
+                        <td>${detail.batch_no || '未知'}</td>
+                        <td class="text-end">${quantity}</td>
+                        <td class="text-end">¥${price.toFixed(2)}</td>
+                        <td class="text-end">¥${subtotal.toFixed(2)}</td>
+                    </tr>
+                `;
+                });
+
+                html += `
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color: #f8f9fa; font-weight: bold;">
+                            <td colspan="5" class="text-end">总计：</td>
+                            <td class="text-end">¥${totalSubtotal.toFixed(2)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            `;
+            } else {
+                html += `
+                    <tr>
+                        <td colspan="6" class="text-center">暂无销售明细</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+            `;
+            }
+
+            document.getElementById('modal-body').innerHTML = html;
+
+        } catch (error) {
+            console.error('获取详情失败:', error);
+
+            // 显示错误信息
+            document.getElementById('modal-body').innerHTML = `
+            <div class="alert alert-danger">
+                <h6>请求失败</h6>
+                <p>${error.message}</p>
+                <p class="mb-0">请检查网络连接或联系系统管理员。</p>
+            </div>
+        `;
+        }
+    }
+</script>
+
+<style>
+    .main-container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 0 20px;
+    }
+
+    /* 表格样式优化 */
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .table td {
+        vertical-align: middle;
+        border-color: #e9ecef;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    /* 对齐优化 */
+    .table th.text-end,
+    .table td.text-end {
+        text-align: right !important;
+        padding-right: 20px !important;
+    }
+
+    .table th.text-center,
+    .table td.text-center {
+        text-align: center !important;
+    }
+
+    /* 操作按钮样式 */
+    .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .btn-primary:hover {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
+    }
+
+    /* 金额样式 */
+    .text-success {
+        color: #28a745 !important;
+        font-weight: 600;
+    }
+
+    /* 模态框表格对齐 */
+    .modal-body .table th.text-end,
+    .modal-body .table td.text-end {
+        text-align: right !important;
+        padding-right: 15px !important;
+    }
+
+    .modal-body .table th.text-center,
+    .modal-body .table td.text-center {
+        text-align: center !important;
+    }
+</style>
 {% endblock %}

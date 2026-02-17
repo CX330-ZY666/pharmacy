@@ -2,8 +2,262 @@
 {% block title %}进货管理{% endblock %}
 
 {% block content %}
-<h2>🛒 进货管理</h2>
-<a href="/purchase/add" class="btn btn-success mb-3">+ 新增采购单</a>
-<!-- TODO: 成员C 实现采购单列表表格 -->
-<p class="text-muted">此页面由成员C负责开发</p>
+<div class="main-container">
+    <h2>🛒 进货管理</h2>
+    <a href="/purchase/add" class="btn btn-success mb-3">+ 新增采购单</a>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- 采购单列表 -->
+    <div class="card">
+        <table class="table table-hover">
+            <thead class="thead-light">
+                <tr>
+                    <th>采购单号</th>
+                    <th>采购日期</th>
+                    <th>供应商</th>
+                    <th>总金额</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="purchaseTableBody">
+                {% if purchases %}
+                {% for purchase in purchases %}
+                <tr>
+                    <td>#{{ purchase.purchase_id }}</td>
+                    <td>{{ purchase.purchase_date }}</td>
+                    <td>{{ purchase.supplier_name }}</td>
+                    <td>¥{{ "%.2f"|format(purchase.total_amount) }}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm view-detail-btn"
+                            data-purchase-id="{{ purchase.purchase_id }}">
+                            查看
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">暂无采购单</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 详情模态框 -->
+    <div id="detailModal" class="modal"
+        style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5);">
+        <div class="modal-content"
+            style="background-color:#fefefe; margin:5% auto; padding:20px; border:1px solid #888; width:80%; max-width:800px; border-radius:8px;">
+            <div class="modal-header"
+                style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:15px;">
+                <h3>采购单详情 #<span id="modalPurchaseId"></span></h3>
+                <span class="close-btn" style="font-size:28px; cursor:pointer; color:#999;"
+                    onclick="closeDetailModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="padding:20px 0; max-height:60vh; overflow-y:auto;">
+                <div style="margin-bottom:20px;">
+                    <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:15px; margin-bottom:15px;">
+                        <div>
+                            <strong>供应商:</strong> <span id="modalSupplier"></span>
+                        </div>
+                        <div>
+                            <strong>采购日期:</strong> <span id="modalDate"></span>
+                        </div>
+                        <div>
+                            <strong>总金额:</strong> <span id="modalAmount"></span>
+                        </div>
+                        <div>
+                            <strong>备注:</strong> <span id="modalNote"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <h4>采购明细</h4>
+                <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+                    <thead style="background-color:#f8f9fa;">
+                        <tr>
+                            <th style="padding:10px; border-bottom:2px solid #dee2e6;">药品名称</th>
+                            <th style="padding:10px; border-bottom:2px solid #dee2e6;">批次号</th>
+                            <th style="padding:10px; border-bottom:2px solid #dee2e6;">数量</th>
+                            <th style="padding:10px; border-bottom:2px solid #dee2e6;">单价</th>
+                            <th style="padding:10px; border-bottom:2px solid #dee2e6;">有效期</th>
+                            <th style="padding:10px; border-bottom:2px solid #dee2e6;">小计</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalDetails">
+                        <!-- 动态填充 -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="text-align:right; border-top:1px solid #eee; padding-top:15px;">
+                <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    
+</div>
+
+<script>
+    // 等待页面加载完成
+    document.addEventListener('DOMContentLoaded', function () {
+        // 绑定查看按钮点击事件（使用事件委托）
+        document.getElementById('purchaseTableBody').addEventListener('click', function (event) {
+            if (event.target.classList.contains('view-detail-btn')) {
+                const purchaseId = event.target.getAttribute('data-purchase-id');
+                if (purchaseId) {
+                    showPurchaseDetail(purchaseId);
+                }
+            }
+        });
+
+        // 绑定模态框外部点击关闭
+        const modal = document.getElementById('detailModal');
+        if (modal) {
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) {
+                    closeDetailModal();
+                }
+            });
+        }
+    });
+
+    // 显示采购单详情
+    async function showPurchaseDetail(purchaseId) {
+        try {
+            console.log('正在获取采购单详情，ID:', purchaseId);
+
+            // 设置基本信息
+            document.getElementById('modalPurchaseId').textContent = purchaseId;
+
+            // 清空之前的内容，显示加载中
+            document.getElementById('modalDetails').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">加载中...</td></tr>';
+
+            // 显示模态框
+            document.getElementById('detailModal').style.display = 'block';
+
+            // 发送请求获取详情
+            const response = await fetch(`/purchase/${purchaseId}`);
+
+            // 检查响应状态
+            if (!response.ok) {
+                throw new Error(`HTTP错误: ${response.status} ${response.statusText}`);
+            }
+
+            // 解析响应数据
+            const result = await response.json();
+
+            // 检查后端返回的success字段
+            if (!result.success) {
+                throw new Error(result.message || '获取详情失败');
+            }
+
+            // 更新基本信息
+            const purchase = result.purchase;
+            const details = result.details || [];
+
+            document.getElementById('modalSupplier').textContent = purchase.supplier_name || '未知';
+            document.getElementById('modalDate').textContent = purchase.purchase_date || '未知';
+
+            // 安全地处理总金额（可能为null或undefined）
+            let totalAmount = 0;
+            if (purchase.total_amount) {
+                // 确保是数字类型
+                totalAmount = parseFloat(purchase.total_amount);
+                if (isNaN(totalAmount)) {
+                    totalAmount = 0;
+                }
+            }
+            document.getElementById('modalAmount').textContent = '¥' + totalAmount.toFixed(2);
+
+            document.getElementById('modalNote').textContent = purchase.note || '无';
+
+            // 更新明细表格
+            const detailsBody = document.getElementById('modalDetails');
+            detailsBody.innerHTML = '';
+
+            if (details.length > 0) {
+                details.forEach(detail => {
+                    // 安全处理数值字段
+                    const quantity = detail.quantity ? parseFloat(detail.quantity) : 0;
+                    const price = detail.price ? parseFloat(detail.price) : 0;
+                    const subtotal = quantity * price;
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                    <td style="padding:10px;border-bottom:1px solid #eee;">${detail.drug_name || '未知'}</td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">${detail.batch_no || '未知'}</td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">${quantity}</td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">¥${price.toFixed(2)}</td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">${detail.expiry_date || '未知'}</td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">¥${subtotal.toFixed(2)}</td>
+                `;
+                    detailsBody.appendChild(row);
+                });
+            } else {
+                detailsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">暂无采购明细</td></tr>';
+            }
+
+        } catch (error) {
+            console.error('获取详情失败:', error);
+
+            // 显示更详细的错误信息
+            const detailsBody = document.getElementById('modalDetails');
+            detailsBody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align:center;padding:20px;color:red;">
+                    请求失败：${error.message}<br>
+                    请检查控制台获取更多信息
+                </td>
+            </tr>
+        `;
+        }
+    }
+
+    // 关闭模态框
+    function closeDetailModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
+
+    // ESC键关闭模态框
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeDetailModal();
+        }
+    });
+</script>
+
+<style>
+    .main-container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 0 20px;
+    }
+
+    .table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.03);
+    }
+
+    .close-btn:hover {
+        color: #333;
+    }
+</style>
 {% endblock %}
